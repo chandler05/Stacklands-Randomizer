@@ -6,6 +6,7 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
 using StacklandsRandomizerNS.ItemReceiver;
 using System.Collections;
+using System.Linq.Expressions;
 
 namespace StacklandsRandomizerNS
 {
@@ -25,7 +26,7 @@ namespace StacklandsRandomizerNS
             InterceptQuestComplete.Logger = Logger;
             RevealAllQuests.Logger = Logger;
 
-            session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:58214"));
+            session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:55167"));
 
             session.Items.ItemReceived += _itemReceived.OnItemReceived;
 
@@ -79,8 +80,8 @@ namespace StacklandsRandomizerNS
             }
         }
 
-        public static void SendLocation(string locationID) {
-            session.Locations.CompleteLocationChecks(session.Locations.GetLocationIdFromName("Stacklands", locationID));
+        public static async Task SendLocation(string locationID) {
+            await session.Locations.CompleteLocationChecksAsync(session.Locations.GetLocationIdFromName("Stacklands", locationID));
         }
 
         public static void UnlockPack(string packName) {
@@ -88,9 +89,7 @@ namespace StacklandsRandomizerNS
         }
 
         public static void CreateCard(string cardName) {
-            Debug.Log("Creating card " + cardName + " at 0.6, 0.5");
             WorldManager.instance.CreateCard(new Vector2(0.0f, 0.0f), cardName, false, false, true);
-            Debug.Log("Card created " + cardName + " at 0.6, 0.5");
         }
 
         public void Update() {
@@ -110,18 +109,9 @@ namespace StacklandsRandomizerNS
         [HarmonyPatch(typeof(WorldManager), "QuestCompleted")]
         public class InterceptQuestComplete {
             public static ModLogger Logger;
-            public static void Prefix(Quest quest) {
-                SendLocation(quest.Description);
+            public static async void Prefix(Quest quest) {
+                await SendLocation(quest.Description);
                 Logger.Log("QuestComplete!");
-                GetAllBoosterPacks();
-            }
-
-            public static void GetAllBoosterPacks() {
-                foreach (BuyBoosterBox boosterpack in FindObjectsOfType<BuyBoosterBox>())
-                {
-                    Logger.Log(boosterpack.transform.position.ToString());
-                    Logger.Log(boosterpack.Booster.Name);
-                }
             }
         }
 
@@ -137,6 +127,14 @@ namespace StacklandsRandomizerNS
             
             static void Postfix(BoosterpackData p, bool allowDebug, ref bool __result) {
                 __result = unlockedPacks.Contains(p.Name);
+            }
+        }
+
+        [HarmonyPatch(typeof(QuestManager), "QuestIsVisible")]
+        public class ShowAllQuests {
+            
+            static void Postfix(ref bool __result) {
+                __result = true;
             }
         }
 

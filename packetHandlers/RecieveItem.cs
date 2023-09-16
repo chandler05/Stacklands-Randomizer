@@ -1,4 +1,5 @@
 using StacklandsRandomizerNS;
+using StacklandsRandomizerNS.IdeaMap;
 ﻿using Archipelago.MultiClient.Net.Helpers;
 using UnityEngine;
 
@@ -13,22 +14,11 @@ namespace StacklandsRandomizerNS.ItemReceiver
             if (name.Contains("Booster Pack")) {
                 StacklandsRandomizer.UnlockPack(name.Replace(" Booster Pack", ""));
             } else {
-                string id = null;
-                switch (name) {
-                    case "Tree":
-                        id = "tree";
-                        break;
-                    case "Rock":
-                        id = "rock";
-                        break;
-                    case "Berry Bush":
-                        id = "berrybush";
-                        break;
-                }
-                if (id != null) {
+                Ideas.allIdeas.TryGetValue(name.Replace("Idea: ", ""), out List<string> ids);
+                foreach (string idea in ids) {
                     lock(StacklandsRandomizer._lock) {
                         StacklandsRandomizer._mainThreadActions.Enqueue(() => {
-                            StacklandsRandomizer.CreateCard(id);
+                            StacklandsRandomizer.CreateCard("blueprint_" + idea);
                         });
                     }
                 }
