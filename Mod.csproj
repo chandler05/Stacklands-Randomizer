@@ -14,7 +14,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Archipelago.MultiClient.Net">
-      <HintPath>$(stacklands)/Stacklands_Data/Managed/Archipelago.MultiClient.Net.dll</HintPath>
+      <HintPath>./resources/Archipelago.MultiClient.Net.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="GameScripts">
