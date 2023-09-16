@@ -1,17 +1,20 @@
-﻿using System.Threading.Tasks;
-using System.Reflection.Emit;
+﻿using System.Reflection.Emit;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
 using StacklandsRandomizerNS.ItemReceiver;
+using System.Collections;
 
 namespace StacklandsRandomizerNS
 {
     public class StacklandsRandomizer : Mod
     {
         private readonly ItemReceived _itemReceived = new();
+
+        public static readonly object _lock = new();
+        public static readonly Queue<Action> _mainThreadActions = new();
 
         public static List<string> unlockedPacks = new List<string>();
         public static ArchipelagoSession session;
@@ -22,7 +25,7 @@ namespace StacklandsRandomizerNS
             InterceptQuestComplete.Logger = Logger;
             RevealAllQuests.Logger = Logger;
 
-            session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:59969"));
+            session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:58214"));
 
             session.Items.ItemReceived += _itemReceived.OnItemReceived;
 
@@ -76,8 +79,8 @@ namespace StacklandsRandomizerNS
             }
         }
 
-        public static async Task SendLocationAsync(string locationID) {
-            await session.Locations.CompleteLocationChecksAsync(session.Locations.GetLocationIdFromName("Stacklands", locationID));
+        public static void SendLocation(string locationID) {
+            session.Locations.CompleteLocationChecks(session.Locations.GetLocationIdFromName("Stacklands", locationID));
         }
 
         public static void UnlockPack(string packName) {
@@ -86,23 +89,30 @@ namespace StacklandsRandomizerNS
 
         public static void CreateCard(string cardName) {
             Debug.Log("Creating card " + cardName + " at 0.6, 0.5");
-            //WorldManager.instance.CreateCard(WorldManager.instance.CurrentBoard.NormalizedPosToWorldPos(new Vector2(0.6f, 0.5f)), cardName, false, false, true);
+            WorldManager.instance.CreateCard(new Vector2(0.0f, 0.0f), cardName, false, false, true);
+            Debug.Log("Card created " + cardName + " at 0.6, 0.5");
         }
 
         public void Update() {
             if (InputController.instance.GetKeyDown(Key.Backslash)) {
                 Debug.Log("Unlocking packs");
                 UnlockPack("Humble Beginnings");
+                CreateCard("berrybush");
+            }
+
+            lock(_lock) {
+                while (_mainThreadActions.Count > 0) {
+                    _mainThreadActions.Dequeue().Invoke();
+                }
             }
         }
     
         [HarmonyPatch(typeof(WorldManager), "QuestCompleted")]
         public class InterceptQuestComplete {
             public static ModLogger Logger;
-            public static async void Prefix(Quest quest) {
-                await SendLocationAsync(quest.Description);
+            public static void Prefix(Quest quest) {
+                SendLocation(quest.Description);
                 Logger.Log("QuestComplete!");
-                //CreateCard("berrybush");
                 GetAllBoosterPacks();
             }
 

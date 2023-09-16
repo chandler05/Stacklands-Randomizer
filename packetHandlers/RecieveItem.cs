@@ -13,16 +13,24 @@ namespace StacklandsRandomizerNS.ItemReceiver
             if (name.Contains("Booster Pack")) {
                 StacklandsRandomizer.UnlockPack(name.Replace(" Booster Pack", ""));
             } else {
+                string id = null;
                 switch (name) {
                     case "Tree":
-                        StacklandsRandomizer.CreateCard("tree");
+                        id = "tree";
                         break;
                     case "Rock":
-                        StacklandsRandomizer.CreateCard("rock");
+                        id = "rock";
                         break;
                     case "Berry Bush":
-                        StacklandsRandomizer.CreateCard("berrybush");
+                        id = "berrybush";
                         break;
+                }
+                if (id != null) {
+                    lock(StacklandsRandomizer._lock) {
+                        StacklandsRandomizer._mainThreadActions.Enqueue(() => {
+                            StacklandsRandomizer.CreateCard(id);
+                        });
+                    }
                 }
             }
 
