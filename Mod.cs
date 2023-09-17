@@ -5,7 +5,8 @@ using UnityEngine.InputSystem;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
 using StacklandsRandomizerNS.ItemReceiver;
-using System.Collections;
+using System.Collections.Generic;
+using System;
 using System.Linq.Expressions;
 
 namespace StacklandsRandomizerNS
@@ -26,7 +27,7 @@ namespace StacklandsRandomizerNS
             InterceptQuestComplete.Logger = Logger;
             RevealAllQuests.Logger = Logger;
 
-            session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:55167"));
+            session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:61167"));
 
             session.Items.ItemReceived += _itemReceived.OnItemReceived;
 
@@ -72,8 +73,6 @@ namespace StacklandsRandomizerNS
 
             Debug.Log(loginSuccess);
 
-            Debug.Log(session.Locations.AllLocations);
-
             foreach (var location in session.Locations.AllLocations)
             {
                 Debug.Log(location);
@@ -81,6 +80,7 @@ namespace StacklandsRandomizerNS
         }
 
         public static async Task SendLocation(string locationID) {
+            Debug.Log("Sending location " + locationID);
             await session.Locations.CompleteLocationChecksAsync(session.Locations.GetLocationIdFromName("Stacklands", locationID));
         }
 
@@ -100,8 +100,10 @@ namespace StacklandsRandomizerNS
             }
 
             lock(_lock) {
-                while (_mainThreadActions.Count > 0) {
-                    _mainThreadActions.Dequeue().Invoke();
+                if (WorldManager.instance.CurrentGameState != WorldManager.GameState.InMenu) {
+                    while (_mainThreadActions.Count > 0) {
+                        _mainThreadActions.Dequeue().Invoke();
+                    }
                 }
             }
         }
@@ -151,6 +153,42 @@ namespace StacklandsRandomizerNS
                 }
 
                 return code.AsEnumerable();
+            }
+        }
+
+        [HarmonyPatch(typeof(WeightedRandomBag<CardChance>), "AddEntry")]
+        public class RemoveBlueprints {
+            static void Prefix(ref CardChance item, float weight) {
+                Debug.Log(item.Id);
+                if (item.Id.Contains("blueprint")) {
+                    item.Id = "berrybush";
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(CardBag), "GetCardsInBag", new Type[] { typeof(GameDataLoader) })]
+        public class RemoveBlueprintsFromBags {
+            static void Postfix(ref GameDataLoader loader, ref List<string> __result) {
+                List<string> toReplace = new();
+                foreach (string card in __result) {
+                    if (card.Contains("blueprint_")) {
+                        toReplace.Add(card);
+                    }
+                }
+                foreach (string card in toReplace) {
+                    __result.Insert(__result.IndexOf(card), "berrybush");
+                    __result.Remove(card);
+                }
+            }
+        }
+
+        // Removes the Combat Intro Boosterpack
+        [HarmonyPatch(typeof(Boosterpack), "Clicked")]
+        public class RemoveCombatIntroPack{
+            static void Prefix() {
+                if (!WorldManager.instance.CurrentSave.FoundBoosterIds.Contains("combat_intro")) {
+                    WorldManager.instance.CurrentSave.FoundBoosterIds.Add("combat_intro");
+                }
             }
         }
     }

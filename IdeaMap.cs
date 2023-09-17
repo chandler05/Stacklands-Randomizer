@@ -47,6 +47,7 @@ namespace StacklandsRandomizerNS.IdeaMap
             {"Shed", new List<string> {"shed"}},
             {"Slingshot", new List<string> {"slingshot"}},
             {"Smelter", new List<string> {"smelting"}},
+            {"Smithy", new List<string> {"smithy"}},
             {"Spear", new List<string> {"woodenweapons"}},
             {"Spiked Plank", new List<string> {"spiked_plank"}},
             {"Stick", new List<string> {"carving"}},
