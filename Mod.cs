@@ -21,20 +21,39 @@ namespace StacklandsRandomizerNS
         public static List<string> unlockedPacks = new List<string>();
         public static ArchipelagoSession session;
         public void Awake() {
+            ConfigEntry<string> port = Config.GetEntry<string>("Server Port", "archipelago.gg:");
+            ConfigEntry<string> name = Config.GetEntry<string>("Slot Name", "Player");
+            ConfigEntry<string> password = Config.GetEntry<string>("Password", "");
+
+            port.UI.OnUI = (ConfigEntryBase entry) =>
+            {
+                var btn = Instantiate(PrefabManager.instance.ButtonPrefab, ModOptionsScreen.instance.ButtonsParent);
+                btn.transform.localScale = Vector3.one;
+                btn.transform.localPosition = Vector3.zero;
+                btn.transform.localRotation = Quaternion.identity;
+
+                btn.TextMeshPro.text = "Connect";
+                btn.TooltipText = "Connect to the Archipelago server";
+                btn.Clicked += () =>
+                {
+                    session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://" + port.Value));
+
+                    session.Items.ItemReceived += _itemReceived.OnItemReceived;
+
+                    Connect(session, name.Value, password.Value.Length > 0 ? password.Value : null);
+                };
+            };
+
             Harmony = new Harmony("com.github.stacklandsrandomizer");
             Harmony.PatchAll();
 
+            ChangeValues();
+
             InterceptQuestComplete.Logger = Logger;
             RevealAllQuests.Logger = Logger;
-
-            session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:61167"));
-
-            session.Items.ItemReceived += _itemReceived.OnItemReceived;
-
-            Connect(session);
         }
 
-        private static void Connect(ArchipelagoSession session)
+        private static void Connect(ArchipelagoSession session, string slotName, string? password = null)
         {
             LoginResult result = null;
 
@@ -42,7 +61,7 @@ namespace StacklandsRandomizerNS
             {
                 Debug.Log("Trying to connect");
 
-                result = session.TryConnectAndLogin("Stacklands", "Chandler", ItemsHandlingFlags.AllItems);
+                result = session.TryConnectAndLogin("Stacklands", slotName, ItemsHandlingFlags.AllItems, password: password);
 
                 Debug.Log(result);
             }
@@ -79,6 +98,13 @@ namespace StacklandsRandomizerNS
             }
         }
 
+        private static void Disconnect() {
+            if (session != null) {
+                session.Socket.DisconnectAsync();
+                session = null;
+            }
+        }
+
         public static async Task SendLocation(string locationID) {
             Debug.Log("Sending location " + locationID);
             await session.Locations.CompleteLocationChecksAsync(session.Locations.GetLocationIdFromName("Stacklands", locationID));
@@ -88,8 +114,21 @@ namespace StacklandsRandomizerNS
             unlockedPacks.Add(packName);
         }
 
+        public static void ChangeValues() {
+            AllQuests.PauseGame = new Quest("pause_game")
+            {
+                OnSpecialAction = ((string action) => action == "pause_game"),
+                QuestGroup = QuestGroup.Starter
+            };
+        }
+
         public static void CreateCard(string cardName) {
             WorldManager.instance.CreateCard(new Vector2(0.0f, 0.0f), cardName, false, false, true);
+        }
+
+        public static string PickBasicRandomCard() {
+            List<string> cards = new List<string>() {"berrybush","rock","tree"};
+            return cards[UnityEngine.Random.Range(0, cards.Count)];
         }
 
         public void Update() {
@@ -156,12 +195,14 @@ namespace StacklandsRandomizerNS
             }
         }
 
-        [HarmonyPatch(typeof(WeightedRandomBag<CardChance>), "AddEntry")]
+        [HarmonyPatch(typeof(WorldManager), "GetRandomCard")]
         public class RemoveBlueprints {
-            static void Prefix(ref CardChance item, float weight) {
-                Debug.Log(item.Id);
-                if (item.Id.Contains("blueprint")) {
-                    item.Id = "berrybush";
+            static void Prefix(ref List<CardChance> chances, ref bool removeCard) {
+                foreach (CardChance item in chances) {
+                    Debug.Log(item.Id);
+                    if (item.Id.Contains("blueprint")) {
+                        item.Id = PickBasicRandomCard();
+                    }
                 }
             }
         }
@@ -176,8 +217,26 @@ namespace StacklandsRandomizerNS
                     }
                 }
                 foreach (string card in toReplace) {
-                    __result.Insert(__result.IndexOf(card), "berrybush");
+                    __result.Insert(__result.IndexOf(card), PickBasicRandomCard());
                     __result.Remove(card);
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(CardBag), "GetRawCardChanges")]
+        public class RemoveBlueprintsFromSetBags {
+            static void Postfix(ref List<CardChance> __result) {
+                List<CardChance> toReplace = new();
+                foreach (CardChance card in __result) {
+                    if (card.Id.Contains("blueprint_")) {
+                        toReplace.Add(card);
+                    }
+                }
+                foreach (CardChance card in toReplace) {
+                    int index = __result.IndexOf(card);
+                    __result.Remove(card);
+                    card.Id = PickBasicRandomCard();
+                    __result.Insert(index, card);
                 }
             }
         }
@@ -189,6 +248,25 @@ namespace StacklandsRandomizerNS
                 if (!WorldManager.instance.CurrentSave.FoundBoosterIds.Contains("combat_intro")) {
                     WorldManager.instance.CurrentSave.FoundBoosterIds.Add("combat_intro");
                 }
+            }
+        }
+
+        [HarmonyPatch(typeof(GameCard), "StartBlueprintTimer")]
+        public class RemoveTimerForUndiscoveredBlueprints {
+            static bool Prefix(ref string blueprintId) {
+                if (!WorldManager.instance.CurrentSave.FoundCardIds.Contains(blueprintId)) {
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        [HarmonyPatch(typeof(MainMenu), "Awake")]
+        public class DisconnectOnQuit {
+            static void Prefix(ref MainMenu __instance) {
+                __instance.QuitButton.Clicked += delegate() {
+                    Disconnect();
+                };
             }
         }
     }

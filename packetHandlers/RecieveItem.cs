@@ -12,6 +12,10 @@ namespace StacklandsRandomizerNS.ItemReceiver
 
             Debug.Log(name);
 
+            foreach (NetworkItem i in item.AllItemsReceived) {
+                Debug.Log(i);
+            }
+
             if (name.Contains("Booster Pack")) {
                 StacklandsRandomizer.UnlockPack(name.Replace(" Booster Pack", ""));
             } else {
