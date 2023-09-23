@@ -22,15 +22,13 @@ namespace StacklandsRandomizerNS
         static ConfigEntry<string> slotName;
         static ConfigEntry<string> password;
         static ConfigEntry<bool> makeConnection;
-        public void Awake() {        
+        public void Awake() {      
             port = Config.GetEntry<string>("Server Port", "archipelago.gg:");
             slotName = Config.GetEntry<string>("Slot Name", "Player");
             password = Config.GetEntry<string>("Password", "");
             makeConnection = Config.GetEntry<bool>("Make Connection", false);
-            
-            makeConnection.UI.Hidden = true;
 
-            port.UI.OnUI = (ConfigEntryBase entry) =>
+            makeConnection.UI.OnUI = (ConfigEntryBase entry) =>
             {
                 var btn = Instantiate(PrefabManager.instance.ButtonPrefab, ModOptionsScreen.instance.ButtonsParent);
                 btn.transform.localScale = Vector3.one;
@@ -42,8 +40,12 @@ namespace StacklandsRandomizerNS
                 btn.Clicked += () =>
                 { 
                     makeConnection.Value = true;
+
+                    Config.Save();
                 };
-            };
+            };  
+            
+            makeConnection.UI.Hidden = true;
 
             Harmony = new Harmony("com.github.stacklandsrandomizer");
             Harmony.PatchAll();
@@ -59,7 +61,7 @@ namespace StacklandsRandomizerNS
         private static void CheckForConnection(StacklandsRandomizer instance) {
             Debug.Log(makeConnection.Value);
             if (makeConnection.Value && !connected) {
-                session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:38281"));
+                session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://" + port.Value));
 
                 session.Items.ItemReceived += _itemReceived.OnItemReceived;
 
@@ -67,10 +69,10 @@ namespace StacklandsRandomizerNS
 
                 Debug.Log(slotName.Value);
 
-                Connect(session, slotName.Value, password.Value.Length > 0 ? password.Value : null);
-
                 makeConnection.Value = false;
                 instance.Config.Save();
+
+                Connect(session, slotName.Value, password.Value.Length > 0 ? password.Value : null);
             }
         }
 
@@ -109,15 +111,6 @@ namespace StacklandsRandomizerNS
 
                 return;
             }
-
-            var loginSuccess = (LoginSuccessful)result;
-
-            Debug.Log(loginSuccess);
-
-            foreach (var location in session.Locations.AllLocations)
-            {
-                Debug.Log(location);
-            }
         }
 
         private static void Disconnect() {
@@ -148,6 +141,10 @@ namespace StacklandsRandomizerNS
             WorldManager.instance.CreateCard(new Vector2(0.0f, 0.0f), cardName, false, false, true);
         }
 
+        public static void SendNotification(string message, string text) {
+            GameScreen.instance.AddNotification(message, text);
+        }
+
         public static string PickBasicRandomCard() {
             List<string> cards = new List<string>() {"berrybush","rock","tree"};
             return cards[UnityEngine.Random.Range(0, cards.Count)];
@@ -161,7 +158,7 @@ namespace StacklandsRandomizerNS
             }
 
             if (makeConnection.Value) {
-                System.Diagnostics.Process.Start(Application.dataPath.Replace("_Data", ".exe"));
+                System.Diagnostics.Process.Start(Application.dataPath.Replace("_Data", ".exe"), "--no-intro");
                 Application.Quit();
             }
 
@@ -171,6 +168,13 @@ namespace StacklandsRandomizerNS
                         _mainThreadActions.Dequeue().Invoke();
                     }
                 }
+            }
+        }
+
+        private void LateUpdate() {
+            if (connected && WorldManager.instance.CurrentGameState == WorldManager.GameState.InMenu) {
+                FindObjectOfType<MainMenu>().UpdateText.text = "Connected to Archipelago";
+                FindObjectOfType<MainMenu>().UpdateInfoButton.TooltipText = "Connected to Archipelago\nPort: " + port.Value + "\nSlot Name: " + slotName.Value;
             }
         }
 
