@@ -5,25 +5,30 @@ using UnityEngine.InputSystem;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
 using StacklandsRandomizerNS.ItemReceiver;
-using System.Collections.Generic;
-using System;
-using System.Linq.Expressions;
 
 namespace StacklandsRandomizerNS
 {
     public class StacklandsRandomizer : Mod
     {
-        private readonly ItemReceived _itemReceived = new();
+        public static readonly ItemReceived _itemReceived = new();
 
         public static readonly object _lock = new();
         public static readonly Queue<Action> _mainThreadActions = new();
 
         public static List<string> unlockedPacks = new List<string>();
         public static ArchipelagoSession session;
-        public void Awake() {
-            ConfigEntry<string> port = Config.GetEntry<string>("Server Port", "archipelago.gg:");
-            ConfigEntry<string> name = Config.GetEntry<string>("Slot Name", "Player");
-            ConfigEntry<string> password = Config.GetEntry<string>("Password", "");
+        public static bool connected = false;
+        static ConfigEntry<string> port;
+        static ConfigEntry<string> slotName;
+        static ConfigEntry<string> password;
+        static ConfigEntry<bool> makeConnection;
+        public void Awake() {        
+            port = Config.GetEntry<string>("Server Port", "archipelago.gg:");
+            slotName = Config.GetEntry<string>("Slot Name", "Player");
+            password = Config.GetEntry<string>("Password", "");
+            makeConnection = Config.GetEntry<bool>("Make Connection", false);
+            
+            makeConnection.UI.Hidden = true;
 
             port.UI.OnUI = (ConfigEntryBase entry) =>
             {
@@ -33,14 +38,10 @@ namespace StacklandsRandomizerNS
                 btn.transform.localRotation = Quaternion.identity;
 
                 btn.TextMeshPro.text = "Connect";
-                btn.TooltipText = "Connect to the Archipelago server";
+                btn.TooltipText = "Connect to the Archipelago server (Stacklands will restart)";
                 btn.Clicked += () =>
-                {
-                    session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://" + port.Value));
-
-                    session.Items.ItemReceived += _itemReceived.OnItemReceived;
-
-                    Connect(session, name.Value, password.Value.Length > 0 ? password.Value : null);
+                { 
+                    makeConnection.Value = true;
                 };
             };
 
@@ -51,6 +52,26 @@ namespace StacklandsRandomizerNS
 
             InterceptQuestComplete.Logger = Logger;
             RevealAllQuests.Logger = Logger;
+
+            CheckForConnection(this);
+        }
+
+        private static void CheckForConnection(StacklandsRandomizer instance) {
+            Debug.Log(makeConnection.Value);
+            if (makeConnection.Value && !connected) {
+                session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://localhost:38281"));
+
+                session.Items.ItemReceived += _itemReceived.OnItemReceived;
+
+                connected = true;
+
+                Debug.Log(slotName.Value);
+
+                Connect(session, slotName.Value, password.Value.Length > 0 ? password.Value : null);
+
+                makeConnection.Value = false;
+                instance.Config.Save();
+            }
         }
 
         private static void Connect(ArchipelagoSession session, string slotName, string? password = null)
@@ -67,6 +88,7 @@ namespace StacklandsRandomizerNS
             }
             catch (Exception e)
             {
+                Debug.Log(e);
                 result = new LoginFailure(e.GetBaseException().Message);
             }
 
@@ -138,6 +160,11 @@ namespace StacklandsRandomizerNS
                 CreateCard("berrybush");
             }
 
+            if (makeConnection.Value) {
+                System.Diagnostics.Process.Start(Application.dataPath.Replace("_Data", ".exe"));
+                Application.Quit();
+            }
+
             lock(_lock) {
                 if (WorldManager.instance.CurrentGameState != WorldManager.GameState.InMenu) {
                     while (_mainThreadActions.Count > 0) {
@@ -146,7 +173,7 @@ namespace StacklandsRandomizerNS
                 }
             }
         }
-    
+
         [HarmonyPatch(typeof(WorldManager), "QuestCompleted")]
         public class InterceptQuestComplete {
             public static ModLogger Logger;
