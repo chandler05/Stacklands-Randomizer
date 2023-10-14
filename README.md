@@ -1,3 +1,3 @@
-# Stacklands Mod Template
+# Stacklands Archipelago Randomizer
 
-For information about using the template, see the Modding Wiki
+A mod for Stacklands that allows it to be integrated into Archipelago.
