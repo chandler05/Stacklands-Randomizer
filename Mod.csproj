@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <AssemblyName>StacklandsRandomizer</AssemblyName>
     <TargetFramework>netstandard2.1</TargetFramework>
@@ -7,18 +6,16 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
-
   <ItemGroup>
     <Reference Include="0Harmony">
       <HintPath>$(stacklands)/Stacklands_Data/Managed/0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Archipelago.MultiClient.Net">
-      <HintPath>$(stacklands)/Stacklands_Data/Managed/Archipelago.MultiClient.Net.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="GameScripts">
       <HintPath>$(stacklands)/Stacklands_Data/Managed/GameScripts.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Archipelago.MultiClient.Net">
       <Private>False</Private>
     </Reference>
     <Reference Include="Mono.Cecil">
