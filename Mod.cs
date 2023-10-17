@@ -89,15 +89,12 @@ namespace StacklandsRandomizerNS
         }
 
         private static void CheckForConnection(StacklandsRandomizer instance) {
-            Debug.Log(makeConnection.Value);
             if (makeConnection.Value && !connected) {
-                session = ArchipelagoSessionFactory.CreateSession(new Uri("ws://" + port.Value));
+                session = ArchipelagoSessionFactory.CreateSession(port.Value);
 
                 session.Items.ItemReceived += _itemReceived.OnItemReceived;
 
                 connected = true;
-
-                Debug.Log(slotName.Value);
 
                 makeConnection.Value = false;
                 instance.Config.Save();
@@ -199,7 +196,7 @@ namespace StacklandsRandomizerNS
             }
         }
 
-        public static void SendGoalAsync(Settings.GoalType goal)
+        public static async void SendGoalAsync(Settings.GoalType goal)
         {
             if (goal != instance.settings.goal)
                 return;
@@ -209,13 +206,15 @@ namespace StacklandsRandomizerNS
                 Status = ArchipelagoClientState.ClientGoal
             };
 
-            Debug.Log("SENDING");
+            Debug.Log("Sending goal completion packet");
 
             //await session.Socket.SendPacketAsync(statusUpdatePacket);
 
             //await session.Locations.CompleteLocationChecksAsync(session.Locations.GetLocationIdFromName("Stacklands", "Kill the Demon"));
 
-            session.Socket.SendPacketAsync(statusUpdatePacket);
+            await session.Socket.SendPacketAsync(statusUpdatePacket);
+
+            Debug.Log("Sent goal completion");
         }
 
         public static void UnlockPack(string packName) {
